@@ -21,6 +21,8 @@ def copy(source,target):
 def transfer(p,q):
  with p.open('rb') as f:
   if f.read(80).startswith(b'version https://git-lfs.github.com/spec/v1'):raise ValueError('Unresolved LFS asset: '+str(p.relative_to(ROOT)))
+ # Nginx blocks Markdown. Publish text license copies without changing the source files.
+ if q.suffix == '.md': q=q.with_suffix('.txt')
  q.parent.mkdir(parents=True,exist_ok=True);shutil.copy2(p,q)
 if SLUG=='elder-protecter':
  for name in ('js','css','vendor','assets'):copy('prototype/'+name,name)
