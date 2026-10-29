@@ -49,7 +49,7 @@ export interface ForestView {
   dispose(): void;
 }
 
-export async function createForest(host: HTMLElement): Promise<ForestView> {
+export async function createForest(host: HTMLElement, progress: (message: string) => void = () => {}): Promise<ForestView> {
   const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
   const requestedQuality=new URLSearchParams(location.search).get('quality');
   const profile=(level:string|null)=>level==='adaptive-min'?{maxWidth:800,maxHeight:500,shadowSize:512,nearDistance:12,farDistance:65}:level==='adaptive-low'||level==='auto'?{maxWidth:960,maxHeight:600,shadowSize:512,nearDistance:18,farDistance:90}:level==='smooth'?naturalConfig.quality.smooth:level==='high'?naturalConfig.quality.high:{maxWidth:sceneConfig.maxWidth,maxHeight:sceneConfig.maxHeight,shadowSize:2048,nearDistance:naturalConfig.vegetation.nearDistance,farDistance:naturalConfig.vegetation.farDistance};
@@ -84,7 +84,8 @@ export async function createForest(host: HTMLElement): Promise<ForestView> {
     const response = await fetch(sceneConfig.manifestUrl);
     if (!response.ok) throw new Error(`场景清单加载失败 (${response.status})`);
     const manifest: ForestManifest = await response.json();
-    const gltf = await new GLTFLoader().loadAsync(sceneConfig.assetUrl);
+    const gltf = await new GLTFLoader().loadAsync(sceneConfig.assetUrl, event => progress(event.lengthComputable ? `主场景下载 ${(event.loaded/1e6).toFixed(1)} / ${(event.total/1e6).toFixed(1)} MB` : `主场景下载 ${(event.loaded/1e6).toFixed(1)} MB`));
+    progress('主场景已下载，正在准备植被、动物与材质…');
     scene.add(gltf.scene);
     // Session seed changes natural silhouettes without moving authored trunks into paths.
     let seed = Number(new URLSearchParams(location.search).get('seed')) || crypto.getRandomValues(new Uint32Array(1))[0];
@@ -337,7 +338,8 @@ export async function createForest(host: HTMLElement): Promise<ForestView> {
       }
     };
     if (new URLSearchParams(location.search).get('engine') !== 'webgl') {
-      activeRenderer = await createIslandRenderer(host, scene, renderer);
+      try { activeRenderer = await createIslandRenderer(host, scene, renderer); }
+      catch (error) { console.info('WebGPU unavailable; using the existing WebGL renderer.', error instanceof Error ? error.message : error); progress('使用 WebGL 兼容显示…'); }
     }
     resize(); place(0);setWeather(new URLSearchParams(location.search).get('weather')==='rain'?'rain':'clear');
     return { renderer: activeRenderer, scene, camera, manifest, position: () => body.toArray() as Point, scenery: () => ({ seed: scenerySeed, animals: [...autumn.moose,...autumn.ducks].map(a => a.position.toArray()), variants: variants.size }), update, resize, setQuality, setWeather, armAudio:async()=>{await Promise.all([weather.armAudio(),soundscape.arm(camera)]);},mute:muted=>{weather.mute(muted);soundscape.mute(muted);}, place, viewpoint, walk, look, resetLook, move, pick, dispose: () => { soundscape.dispose();creek.dispose();weather.dispose(); if (activeRenderer !== renderer) activeRenderer.dispose(); environment.dispose(); detachedGeometry.forEach(g => g.dispose()); disposeScene(scene, renderer); } };

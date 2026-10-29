@@ -73,3 +73,10 @@ npm run preview
 ## 秋季生态升级保存
 
 原生 WebGPU、天气、动物骨架、生态、自然声音和地图偏离提示见 [详细开发记录](docs/scene-ecology-upgrade.md)。自动化检查可审阅；写实外观、听感、真人眼动与原画性能仍未通过验收。此保存不合并、不关闭阶段，后续眼动徒步待接入。
+
+
+## Collective 展示适配
+
+原作者、采用版本及贡献记录见 [ATTRIBUTION.md](ATTRIBUTION.md)。
+独立静态入口：`/demo/focus-hiking/`。官网只加载静态封面，点击后才进入交互。
+构建与验收见 [exhibit/README.md](exhibit/README.md)。

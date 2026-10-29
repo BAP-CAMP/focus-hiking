@@ -21,3 +21,8 @@ Thumbs.db
 *.blend2
 __pycache__/
 *.pyc
+
+# Local Collective build and verification artifacts
+/exhibit-dist/
+/temp/
+/.tools/

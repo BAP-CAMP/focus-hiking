@@ -27,7 +27,7 @@ export function mountHikeExperience(parent: HTMLElement) {
         <fieldset class="hike-duration"><legend>给自己留一点时间</legend>${[5, 10, 15].map(m => `<label><input type="radio" name="duration" value="${m}" ${m === minutes ? 'checked' : ''}>${m} 分钟</label>`).join('')}</fieldset>
         <label class="environment-select">本次使用的环境<select id="environment-select" aria-label="本次使用的环境"></select></label>
         <button class="primary" id="hike-setup">校准并开始</button>
-        <p class="hike-note">第一次准备好目光，以后从环境存档轻松出发。<br>同一环境完成三次测试后，未达标也可直接体验。</p>
+        <p class="hike-note">完整体验请使用电脑。注视交互需要摄像头与 HTTPS；仅在本机处理图像，不上传、不保存。<br>也可选择下方鼠标与键盘模式。</p>
         <a class="mountains-explore" href="${sitePath('?mode=explore')}">暂不开摄像头，用鼠标与键盘漫步</a>
         <details><summary>我的徒步记录</summary><div class="hike-home-archive"></div></details>
       </section>
@@ -109,7 +109,7 @@ export function mountHikeExperience(parent: HTMLElement) {
           await new Promise<void>(resolve => requestAnimationFrame(() => requestAnimationFrame(() => resolve())));
           if (disposed || operation !== epoch) return;
           const savedProfile = environments.get(selectedId);
-          await camera.start('CPU', (savedProfile.signature?.videoWidth ?? 640) >= 1000 ? '1280' : '640'); if (disposed || operation !== epoch) return;
+          await camera.start('CPU', (savedProfile.signature?.videoWidth ?? 640) >= 1000 ? '1280' : '640'); if (disposed || operation !== epoch) { camera.dispose(); return; }
           const profile = environments.get(selectedId), kind = quickEntryKind(profile);
           if (!kind || !sameEnvironment(profile.signature, camera.environment)) throw new Error('摄像头或显示环境与存档不同，请返回首页选择对应环境或新建环境');
           const saved = kind === 'saved' ? profile.saved : profile.latest;

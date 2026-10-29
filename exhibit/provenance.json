@@ -1,0 +1,15 @@
+{
+  "title": "此刻山间",
+  "slug": "focus-hiking",
+  "upstream": "https://github.com/llllllir/focus-hiking",
+  "fork": "https://github.com/BAP-CAMP/focus-hiking",
+  "base": "69400dbb391cc91b4f702773d3b6d66f2797940d",
+  "authors": [
+    "llllllir",
+    "RUI-TW"
+  ],
+  "device": "摄像头体验需要电脑、摄像头和 HTTPS。",
+  "note": "注视与登山交互演示，不代表注意力训练效果。",
+  "adoptedBranch": "codex/m3-attention-calibration-fix",
+  "repositoryVisibility": "public"
+}

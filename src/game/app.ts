@@ -17,9 +17,9 @@ export interface GameOptions {
 export function mountGame(app: HTMLElement, attention?: AttentionPort, options: GameOptions = {}) {
   app.innerHTML = `
     <div class="scene-host" aria-label="森林登山三维场景"></div>
-    <header class="topbar"><a class="brand" href="${sitePath()}">此刻山间 <span>· Here in the Mountains</span></a><span class="version">场景2.0 · 山林探索 / 画质未验收</span></header>
+    <header class="topbar"><a class="brand" href="${sitePath()}">此刻山间 <span>· Here in the Mountains</span></a><span class="version">秋季山林 · 鼠标与键盘探索</span></header>
     <section class="intro"><p class="eyebrow">FOREST WALK · 林间漫步</p><h1>走进林间，<br>留一点时间给自己。</h1><p class="intro-copy">穿过溪谷、白桦林与山坡。<br>自由漫步，或规划一段登顶路线。</p><button class="primary" id="start" disabled>正在准备森林…</button><p class="hint">自由探索 · 路线规划 · 可随时暂停</p></section>
-    <aside class="explore" hidden><h2>林地探索</h2><p>拖动画面转头 · WASD 行走<br>同一片山林，选择自己的走法</p><button id="mode">路线规划</button><button id="center">视角归正</button><svg id="explorer-map" viewBox="-195 -255 390 381" role="img" aria-label="探索地图：三条连通小径与当前位置" style="width:100%;height:180px;background:#24332b;border:1px solid #ffffff35"></svg><div class="destinations" hidden><button data-destination="camp">营地</button><button data-destination="trail">苔岩环线</button><button data-destination="creek">溪谷木桥</button><button data-destination="ridge">山顶俯瞰</button></div><button id="depart" hidden disabled>确认路线并出发</button><p id="navigation-status" aria-live="polite">自由探索 · 地图显示当前位置</p><small>真实眼动尚未接入；当前目的地用鼠标选择。</small></aside>
+    <aside class="explore" hidden><h2>林地探索</h2><p>拖动画面转头 · WASD 行走<br>同一片山林，选择自己的走法</p><button id="mode">路线规划</button><button id="center">视角归正</button><svg id="explorer-map" viewBox="-195 -255 390 381" role="img" aria-label="探索地图：三条连通小径与当前位置" style="width:100%;height:180px;background:#24332b;border:1px solid #ffffff35"></svg><div class="destinations" hidden><button data-destination="camp">营地</button><button data-destination="trail">苔岩环线</button><button data-destination="creek">溪谷木桥</button><button data-destination="ridge">山顶俯瞰</button></div><button id="depart" hidden disabled>确认路线并出发</button><p id="navigation-status" aria-live="polite">自由探索 · 地图显示当前位置</p><small>当前为鼠标与键盘模式；目的地用鼠标选择。</small></aside>
     <aside class="error" role="alert" hidden><h2>暂时无法进入森林</h2><p></p><button id="retry">重新加载</button></aside>
     <section class="controls" hidden><div class="journey"><span id="stage">营地出发</span><span id="time">00:00 / 02:00</span></div><progress max="1" value="0" aria-label="游览进度"></progress><div class="buttons"><button id="pause">暂停</button><button id="restart">回到起点</button><button id="report">下载运行记录</button></div></section>
     <footer class="footer"><span>混合林 · 溪谷 · 山坡 <label style="margin-left:12px">画质 <select id="quality" aria-label="场景画质"><option value="original">原画</option><option value="high">高清</option><option value="smooth">流畅</option></select></label> <label>天气 <select id="weather" aria-label="天气模式"><option value="clear">晴天</option><option value="rain">阴雨雷暴</option></select></label> <button id="storm-sound" aria-pressed="false">开启环境声音</button></span><span id="metrics">加载中</span><a href="${sitePath('audio/forest/CREDITS.md')}" target="_blank" rel="noopener" style="color:inherit">声音来源</a></footer>
@@ -190,7 +190,7 @@ export function mountGame(app: HTMLElement, attention?: AttentionPort, options: 
     error.hidden = true; start.disabled = true; start.textContent = '正在准备森林…';
     startedAt = performance.now();
     try {
-      const view = await createForest(host);
+      const view = await createForest(host, message => { if (!disposed && id === attempt) start.textContent = message; });
       if (disposed || id !== attempt) { view.dispose(); return; }
       forest = view; loadedMs = performance.now() - startedAt;
       if ('backend' in view.renderer) gpu = `${view.renderer.backend} ${view.renderer.gpuDescription}`;
@@ -214,7 +214,7 @@ export function mountGame(app: HTMLElement, attention?: AttentionPort, options: 
     } catch (cause) {
       if (disposed || id !== attempt) return;
       error.hidden = false; start.textContent = '加载未完成';
-      error.querySelector('p')!.textContent = `${cause instanceof Error ? cause.message : '加载失败'}。请使用支持 WebGPU 的 Edge / Chrome；兼容模式可在地址后添加 ?engine=webgl。`;
+      error.querySelector('p')!.textContent = `${cause instanceof Error ? cause.message : '加载失败'}。请检查网络与浏览器图形支持，然后点击重新加载。`;
       options.onError?.(error.querySelector('p')!.textContent!);
     }
   };
