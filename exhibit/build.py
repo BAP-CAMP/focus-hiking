@@ -8,6 +8,7 @@ OUT=ROOT/'exhibit-dist'
 # Build in a new task-owned directory; a failed build cannot replace the last output.
 STAGE=ROOT/'temp'/'builds'/str(time.time_ns())
 STAGE.mkdir(parents=True)
+license_names={}
 def copy(source,target):
  p=ROOT/source;q=STAGE/target
  if p.is_dir():
@@ -22,7 +23,9 @@ def transfer(p,q):
  with p.open('rb') as f:
   if f.read(80).startswith(b'version https://git-lfs.github.com/spec/v1'):raise ValueError('Unresolved LFS asset: '+str(p.relative_to(ROOT)))
  # Nginx blocks Markdown. Publish text license copies without changing the source files.
- if q.suffix == '.md': q=q.with_suffix('.txt')
+ if q.suffix == '.md':
+  license_names[q.name]=q.with_suffix('.txt').name
+  q=q.with_suffix('.txt')
  q.parent.mkdir(parents=True,exist_ok=True);shutil.copy2(p,q)
 if SLUG=='elder-protecter':
  for name in ('js','css','vendor','assets'):copy('prototype/'+name,name)
@@ -55,6 +58,12 @@ html=html.replace('</head>',f'<script defer src="{prefix}exhibit.js"></script></
 # The direct native gait entry also carries attribution/lifecycle controls.
 if SLUG=='smart-backpack':
  p=STAGE/'exports/gait/index.html';p.write_text(p.read_text().replace('</head>','<script defer src="../../exhibit.js"></script></head>'))
+# Update links to packaged license notices in static pages and runtime UI.
+for p in STAGE.rglob('*'):
+ if p.suffix in ('.html','.js'):
+  text=p.read_text()
+  for old,new in license_names.items(): text=text.replace(old,new)
+  p.write_text(text)
 files=[]
 for p in sorted(STAGE.rglob('*')):
  if p.is_file():files.append({'path':p.relative_to(STAGE).as_posix(),'bytes':p.stat().st_size,'sha256':hashlib.sha256(p.read_bytes()).hexdigest()})
