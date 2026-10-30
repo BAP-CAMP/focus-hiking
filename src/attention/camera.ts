@@ -34,6 +34,43 @@ export class CameraAttention implements AttentionPort {
   private visibilityEpoch = 0;
   private frameEpoch = 0;
   private deviceKey = '';
+  private disposed = false;
+  private requested = false;
+  private resumeOperation = 0;
+  private resolution: '640' | '1280' = '640';
+  private suspended: { snapshot: CalibrationSnapshot; signature: EnvironmentSignature | null; unverified: boolean; ready: boolean } | null = null;
+  private suspendExhibit = () => {
+    this.resumeOperation++;
+    if (!this.suspended && (this.requested || this.running)) {
+      this.suspended = { snapshot: this.exportCalibration(), signature: this.environment, unverified: this.unverifiedEntry, ready: this.interactionReady };
+      document.documentElement.dataset.exhibitCamera = 'true';
+    }
+    if (this.suspended) this.stop();
+  };
+  private resumeExhibit = (event: Event) => {
+    if (!this.suspended || this.disposed) return;
+    (event as CustomEvent<{waitUntil:(promise:Promise<void>)=>void}>).detail?.waitUntil(this.restoreExhibit());
+  };
+  private async restoreExhibit() {
+    const saved = this.suspended, operation = ++this.resumeOperation;
+    if (!saved) return;
+    if (!document.fullscreenElement) await document.documentElement.requestFullscreen();
+    if (this.disposed || operation !== this.resumeOperation || document.hidden) return;
+    await this.start('CPU', this.resolution);
+    if (this.disposed || operation !== this.resumeOperation || document.hidden) { this.stop(); return; }
+    if (!this.running) throw new Error('摄像头未能恢复，请重试');
+    const matches = !!saved.signature && sameEnvironment(saved.signature, this.environment);
+    if (matches && saved.ready) {
+      this.restoreCalibration(saved.snapshot, saved.signature!);
+      if (saved.unverified) { if(saved.snapshot.mapping && saved.snapshot.screenModel)this.allowUnverifiedEntry();else this.allowBasicEntry(); }
+      this.setInteractionEnabled(true);
+    } else {
+      this.clearCalibration();
+      this.onStatus('摄像头已恢复，请重新完成校准；徒步进度已保留。');
+    }
+    this.suspended = null; delete document.documentElement.dataset.exhibitCamera;
+    window.dispatchEvent(new CustomEvent('exhibit:camera-restored', {detail:{camera:this, recalibrate:!matches || !saved.ready}}));
+  }
   private visibility = () => {
     this.visibilityEpoch++;
     if (document.hidden) this.invalidate('background');
@@ -50,6 +87,8 @@ export class CameraAttention implements AttentionPort {
   constructor(private onUpdate: (update: CameraUpdate) => void = () => {}, private onStatus: (status: string) => void = () => {}) {
     this.video.muted = true; this.video.playsInline = true;
     document.addEventListener('visibilitychange', this.visibility);
+    window.addEventListener('exhibit:pause', this.suspendExhibit);
+    window.addEventListener('exhibit:resume', this.resumeExhibit);
     window.addEventListener('resize', this.viewportChange);
     document.addEventListener('fullscreenchange', this.viewportChange);
   }
@@ -117,7 +156,9 @@ export class CameraAttention implements AttentionPort {
   }
   async start(delegate: 'CPU' | 'GPU' = 'CPU', resolution: '640' | '1280' = '640') {
     this.stop();
+    this.requested = true; this.resolution = resolution;
     const generation = this.generation;
+    if (document.hidden || document.documentElement.dataset.exhibitPaused) { this.suspendExhibit(); return; }
     if (!navigator.mediaDevices?.getUserMedia) throw new Error('当前浏览器无法使用摄像头，请用本机 localhost 或 HTTPS 打开');
     this.onStatus('等待摄像头授权');
     const stream = await navigator.mediaDevices.getUserMedia({ video: { width: { ideal: Number(resolution) }, height: { ideal: resolution === '1280' ? 720 : 480 }, frameRate: { ideal: 30 } }, audio: false });
@@ -146,7 +187,7 @@ export class CameraAttention implements AttentionPort {
             this.process(message.result, message.timestampMs, message.processingMs, performance.now() - this.sentAt);
           }
         };
-        const message: WorkerRequest = { type: 'init', baseUrl: new URL(import.meta.env.BASE_URL, location.href).href, delegate };
+        const message: WorkerRequest = { type: 'init', baseUrl: new URL(import.meta.env?.BASE_URL ?? '/', location.href).href, delegate };
         worker.postMessage(message);
       });
       if (generation !== this.generation) return;
@@ -188,6 +229,7 @@ export class CameraAttention implements AttentionPort {
     this.publish({ ...this.pipeline.process(result, timestampMs, !!document.fullscreenElement), processingMs, pipelineMs });
   }
   stop() {
+    this.requested = false;
     this.deviceKey = '';
     this.generation++;
     this.pendingReject?.(new Error('摄像头启动已取消')); this.pendingReject = null;
@@ -198,5 +240,5 @@ export class CameraAttention implements AttentionPort {
     this.busy = false; this.lastVideoTime = -1; this.pipeline.clear();
     this.invalidate('stopped');
   }
-  dispose() { this.stop(); document.removeEventListener('visibilitychange', this.visibility); window.removeEventListener('resize', this.viewportChange); document.removeEventListener('fullscreenchange', this.viewportChange); this.sampleListeners.clear(); this.eventListeners.clear(); this.statusListeners.clear(); this.updateListeners.clear(); }
+  dispose() { if(this.disposed)return;this.disposed = true; this.resumeOperation++; this.suspended = null; delete document.documentElement.dataset.exhibitCamera; window.removeEventListener('exhibit:pause', this.suspendExhibit); window.removeEventListener('exhibit:resume', this.resumeExhibit); this.stop(); document.removeEventListener('visibilitychange', this.visibility); window.removeEventListener('resize', this.viewportChange); document.removeEventListener('fullscreenchange', this.viewportChange); this.sampleListeners.clear(); this.eventListeners.clear(); this.statusListeners.clear(); this.updateListeners.clear(); }
 }

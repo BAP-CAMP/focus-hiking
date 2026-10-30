@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Build an allowlisted static exhibit. No source or existing release is deleted."""
 from pathlib import Path
-import hashlib,json,shutil,subprocess,os,time
+import hashlib,json,shutil,subprocess,os,time,re
 ROOT=Path(__file__).resolve().parents[1]
 SLUG=ROOT.name
 OUT=ROOT/'exhibit-dist'
@@ -63,6 +63,16 @@ for p in STAGE.rglob('*'):
  if p.suffix in ('.html','.js'):
   text=p.read_text()
   for old,new in license_names.items(): text=text.replace(old,new)
+  p.write_text(text)
+# Browser/CDN caches keep unbundled modules for hours. Version every relative
+# JavaScript reference so entry pages cannot mix old and new lifecycle modules.
+revision=subprocess.check_output(['git','rev-parse','HEAD'],cwd=ROOT,text=True).strip()[:12]
+changes=subprocess.check_output(['git','diff','HEAD','--binary'],cwd=ROOT)
+if changes:revision+='-'+hashlib.sha256(changes).hexdigest()[:8]
+for p in STAGE.rglob('*'):
+ if p.suffix in ('.html','.js'):
+  text=p.read_text()
+  text=re.sub(r"([\"'])(\.{1,2}/[^\"'\s]+\.js)(\?[^\"'\s]*)?\1",lambda m:m[1]+m[2]+(m[3]+'&' if m[3] else '?')+'exhibit='+revision+m[1],text)
   p.write_text(text)
 files=[]
 for p in sorted(STAGE.rglob('*')):

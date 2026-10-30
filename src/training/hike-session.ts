@@ -21,6 +21,7 @@ export class HikeSession {
   private latestTimestamp = -Infinity;
   private away = false;
   private stormUntil = 0;
+  private pausedStormMs = 0;
   private record: HikeRecord | null = null;
   private startedAt = '';
   private frameMs = 0;
@@ -64,15 +65,15 @@ export class HikeSession {
   isWalking(now: number) { return this.phase === 'running' && this.gazeState(now) === 'on-screen'; }
   // Once a verified absence starts feedback, a brief camera/renderer gap cannot
   // restart thunder repeatedly. Only a confirmed return or the deadline ends it.
-  isStorm(now: number) { return this.phase === 'running' && this.away && now < this.stormUntil; }
+  isStorm(now: number) { return this.away && (this.phase === 'paused' ? this.pausedStormMs > 0 : this.phase === 'running' && now < this.stormUntil); }
   direction(now: number) {
     if (!this.isWalking(now)) return null;
     // Screen ray projected onto horizontal camera space. Vertical gaze changes
     // look elevation; the walker never teleports to a distant gaze intersection.
     return { x: this.sample!.x!, y: this.sample!.y! };
   }
-  pause(now: number) { this.tick(now); if (this.phase === 'running') { this.phase = 'paused'; this.sample = null; } }
-  resume(now: number) { if (this.phase === 'paused' && Number.isFinite(now)) { this.phase = 'running'; this.lastNow = now; this.sample = null; } }
+  pause(now: number) { this.tick(now); if (this.phase === 'running') { this.pausedStormMs = Math.max(0, this.stormUntil-now); this.phase = 'paused'; this.sample = null; } }
+  resume(now: number) { if (this.phase === 'paused' && Number.isFinite(now)) { this.stormUntil = now + this.pausedStormMs; this.phase = 'running'; this.lastNow = now; this.sample = null; } }
   stop(now: number) { this.tick(now); if (this.phase === 'running' || this.phase === 'paused') this.finish('stopped'); return this.summary(); }
   addMovement(distance: number, dtMs: number) {
     if (this.phase !== 'running') return;

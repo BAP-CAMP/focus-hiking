@@ -1,9 +1,7 @@
 import './style.css';
 
 let disposeCurrent: (() => void) | undefined;
-addEventListener('exhibit:pause', () => disposeCurrent?.());
-addEventListener('exhibit:resume', () => location.reload());
-addEventListener('pagehide', () => disposeCurrent?.());
+addEventListener('pagehide', event => { if (!event.persisted) disposeCurrent?.(); });
 const app = document.querySelector<HTMLElement>('#app')!;
 const search=new URLSearchParams(location.search),mode=search.get('mode');
 if (mode==='hike'||(!mode&&!search.has('view'))) {
@@ -39,4 +37,6 @@ if (mode==='hike'||(!mode&&!search.has('view'))) {
 }
 
 // A visibility transition may happen while a lazy module is still importing.
-if (document.documentElement.dataset.exhibitPaused) disposeCurrent?.();
+if (document.hidden || document.documentElement.dataset.exhibitPaused) dispatchEvent(new Event('exhibit:pause'));
+document.documentElement.dataset.exhibitReady = 'true';
+dispatchEvent(new Event('exhibit:ready'));

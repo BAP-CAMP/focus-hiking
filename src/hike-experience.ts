@@ -78,17 +78,23 @@ export function mountHikeExperience(parent: HTMLElement) {
     clear(); const operation = epoch;
     const calibration = document.createElement('div'), scene = document.createElement('div');
     calibration.className = 'gaze-session-layer'; scene.className = 'gaze-session-layer gaze-scene-root'; scene.hidden = true; parent.replaceChildren(calibration, scene);
+    let activeGame: ReturnType<typeof mountHikeGame> | null = null;
+    let calibrationDispose: (()=>void) | null = null;
+    const showCalibration = (camera:CameraAttention) => {
+      activeGame?.suspend(); camera.setInteractionEnabled(false); scene.hidden=true; calibration.hidden=false;
+      if(quick&&!calibrationDispose) calibrationDispose=mountGazeTest(calibration,{camera,onSceneReady:enter,environment:{store:environments,id:selectedId}});
+    };
     const enter = (camera: CameraAttention) => {
       if (entering || disposed || operation !== epoch || !camera.interactionReady) return;
       entering = true;
       try {
         calibration.hidden = true; scene.hidden = false;
+        if (activeGame) { camera.setInteractionEnabled(true); activeGame.resume(); return; }
         const game = mountHikeGame(scene, camera, { minutes, archive, isReady: () => camera.interactionReady, onExit: home, onRecalibrate: () => {
-          if (quick) { setup(); return; }
-          gameDispose?.(); gameDispose = null; camera.setInteractionEnabled(false); scene.hidden = true; calibration.hidden = false;
+          showCalibration(camera);
         } });
         if (camera.unverifiedEntry || quick) { const note = document.createElement('p'); note.className = 'gaze-unverified-notice'; note.textContent = camera.unverifiedEntry ? '免测体验 · 尚未通过精度验证，方向与离屏判断可能不准。' : '已加载本机成功环境存档 · 本次未重新验证'; scene.append(note); }
-        gameDispose = () => game.dispose(); camera.setInteractionEnabled(true);
+        activeGame = game; gameDispose = () => game.dispose(); camera.setInteractionEnabled(true);
       } catch (error) { scene.hidden = true; calibration.hidden = false; const status = calibration.querySelector('.gaze-status'); if (status) status.textContent = error instanceof Error ? error.message : '暂时无法进入森林，请重试'; }
       finally { entering = false; }
     };
@@ -122,6 +128,12 @@ export function mountHikeExperience(parent: HTMLElement) {
         }
       })();
     }
+    const cameraRestored = (event: Event) => {
+      if ((event as CustomEvent).detail.recalibrate && activeGame) showCalibration((event as CustomEvent).detail.camera);
+    };
+    window.addEventListener('exhibit:camera-restored', cameraRestored);
+    const originalSetupDispose=setupDispose;
+    setupDispose=()=>{window.removeEventListener('exhibit:camera-restored',cameraRestored);calibrationDispose?.();originalSetupDispose?.();};
     const back = document.createElement('button'); back.className = 'hike-setup-back'; back.textContent = '返回首页'; back.onclick = home; calibration.append(back);
   };
   home(); return () => { if (disposed) return; disposed = true; clear(); parent.removeEventListener('pointerdown', unlockAudio, true); parent.removeEventListener('keydown', unlockAudio, true); releaseAudio(); parent.replaceChildren(); };

@@ -103,7 +103,7 @@ export function mountHikeGame(parent:HTMLElement,attention:AttentionPort,options
   const save=()=>{const record=session.summary();if(saved||!record)return;const error=archive.save(record);saved=true;if(error)result.dataset.saveError=error;};
   const setText=(element:HTMLElement,text:string)=>{if(element.textContent!==text)element.textContent=text;};
   function updateUi(now:number){
-    if(session.phase==='idle'&&forest&&!document.hidden) beginJourney(now);
+    if(session.phase==='idle'&&forest&&!document.hidden&&!document.documentElement.dataset.exhibitPaused&&(options.isReady?.()??true)) beginJourney(now);
     const state=session.gazeState(now),paused=session.phase==='paused';
     setText(get('#hike-clock'),`${formatTime(session.elapsedMs)} / ${session.plannedMinutes}:00`);
     get<HTMLProgressElement>('#hike-progress').value=session.elapsedMs/(session.plannedMinutes*60000);
@@ -141,12 +141,16 @@ export function mountHikeGame(parent:HTMLElement,attention:AttentionPort,options
   get('#hike-stop').onclick=()=>{session.stop(performance.now());save();forest?.setWeather('clear');weather='clear';get<HTMLSelectElement>('#weather').value='clear';showResult();};
   get('#hike-pause').onclick=()=>{if(session.phase==='running'){session.pause(performance.now());get('#hike-pause').textContent='继续';}else if(session.phase==='paused'&&(options.isReady?.()??true)){const now=performance.now();session.resume(now);if(latest)session.accept(latest,now);get('#hike-pause').textContent='暂停';}nextUi=0;};
   get('#hike-calibrate').onclick=options.onRecalibrate;
-  const pauseForBackground=()=>{if(document.hidden&&session.phase==='running'){session.pause(performance.now());get('#hike-pause').textContent='继续';}};
-  const pagehide=()=>{session.stop(performance.now());save();};
+  let exhibitSuspended=false, wasRunning=false;
+  const suspendExhibit=()=>{if(exhibitSuspended)return;exhibitSuspended=true;wasRunning=session.phase==='running';session.pause(performance.now());get('#hike-pause').textContent='继续';};
+  const resumeExhibit=()=>{if(!exhibitSuspended||!(options.isReady?.()??true))return;exhibitSuspended=false;if(wasRunning){session.resume(performance.now());get('#hike-pause').textContent='暂停';}latest=null;nextUi=0;};
+  const pauseForBackground=()=>{if(document.hidden)suspendExhibit();};
+  const pagehide=(event:PageTransitionEvent)=>{if(!event.persisted){session.stop(performance.now());save();}};
+  window.addEventListener('exhibit:before-pause',suspendExhibit);window.addEventListener('exhibit:pause',suspendExhibit);window.addEventListener('exhibit:resumed',resumeExhibit);
   document.addEventListener('visibilitychange',pauseForBackground);window.addEventListener('pagehide',pagehide);
   const modalKeys=(event:KeyboardEvent)=>{if(result.hidden||event.key!=='Tab')return;const controls=[...result.querySelectorAll<HTMLElement>('button:not([disabled]),input,a[href],summary')].filter(el=>el.offsetParent!==null);const first=controls[0],last=controls.at(-1);if(event.shiftKey&&document.activeElement===first){event.preventDefault();last?.focus();}else if(!event.shiftKey&&document.activeElement===last){event.preventDefault();first?.focus();}};
   parent.addEventListener('keydown',modalKeys);
-  return {get session(){return session;},get forest(){return forest;},frameTimes,
-    dispose(){if(disposed)return;disposed=true;session.stop(performance.now());save();off();document.removeEventListener('visibilitychange',pauseForBackground);window.removeEventListener('pagehide',pagehide);parent.removeEventListener('keydown',modalKeys);game.dispose();},
+  return {get session(){return session;},get forest(){return forest;},frameTimes, suspend:suspendExhibit, resume:resumeExhibit,
+    dispose(){if(disposed)return;disposed=true;window.removeEventListener('exhibit:before-pause',suspendExhibit);window.removeEventListener('exhibit:pause',suspendExhibit);window.removeEventListener('exhibit:resumed',resumeExhibit);session.stop(performance.now());save();off();document.removeEventListener('visibilitychange',pauseForBackground);window.removeEventListener('pagehide',pagehide);parent.removeEventListener('keydown',modalKeys);game.dispose();},
   };
 }

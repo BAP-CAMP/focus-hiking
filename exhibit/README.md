@@ -11,3 +11,7 @@
 独立页面添加返回 Collective、来源说明、暂停与手动继续；后台暂停持续渲染与音频。山间体验同时释放摄像头，继续时重新进入准备流程。主页卡片不预取这些资源。
 
 2026-10-29 本地浏览器检查已完成，正式发布尚未授权。整批证据保存在官网 `docs/verification/2026-10-29-collective.md` 和本地审阅包，真实设备与摄像头实测单独验收。部署流程要求源仓干净且 HEAD 已推送到 BAP-CAMP；不能把本地 dirty 构建当成已发布版本。
+
+## Lifecycle maintenance — website 1.1.1
+
+Background suspension preserves the mounted experience. A compact, nonmodal status bar requires one explicit continue action. Initial hidden loading, asynchronous restore, failure/retry and focus restoration use the common `exhibit:pause` / `exhibit:resume` / `exhibit:resumed` lifecycle. Only previously running content resumes. Source and artifact manifests remain separate from the website version. Regression checks and the atomic multi-demo release are maintained in the website repository. Camera tests use synthetic devices only.

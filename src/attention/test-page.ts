@@ -39,7 +39,7 @@ function shuffle<T>(items: T[]): T[] {
 const clamp = (v: number, min = 0, max = 1) => Math.max(min, Math.min(max, v));
 const percent = (v: number | null) => v === null ? '—' : `${(v * 100).toFixed(1)}%`;
 
-export function mountGazeTest(parent: HTMLElement, options: { onSceneReady?: (camera: CameraAttention) => void; environment?: { store: EnvironmentStore; id: string } } = {}) {
+export function mountGazeTest(parent: HTMLElement, options: { camera?: CameraAttention; onSceneReady?: (camera: CameraAttention) => void; environment?: { store: EnvironmentStore; id: string } } = {}) {
   document.title = '眼动准备 · 此刻山间 · Here in the Mountains';
   parent.innerHTML = `<main class="gaze-page">
     <div class="gaze-grid" aria-hidden="true"></div>
@@ -51,7 +51,7 @@ export function mountGazeTest(parent: HTMLElement, options: { onSceneReady?: (ca
     <header class="gaze-heading"><a href="${import.meta.env.BASE_URL}">此刻山间 · Here in the Mountains</a><span>校准 → 验证 → 场景交互</span></header>
     <div class="gaze-axis-label gaze-left">向左看</div><div class="gaze-axis-label gaze-right">向右看</div>
     <div class="gaze-crosshair" aria-hidden="true"></div><div class="gaze-ball is-invalid" aria-label="注视跟随球"></div>
-    <section class="gaze-intro"><p class="gaze-eyebrow">FOLLOW YOUR GAZE</p><h1>让目光，带动小球。</h1><p>进入全屏 → 开启摄像头 → 连续校准与验证。<br>跟随圆点；切到后台会暂停，回来只需重试当前点。</p></section>
+    <section class="gaze-intro"><p class="gaze-eyebrow">FOLLOW YOUR GAZE</p><h1>让目光，带动小球。</h1><p>进入全屏 → 开启摄像头 → 连续校准与验证。<br>跟随圆点；切到后台会关闭摄像头；继续后重新执行未完成的校准步骤。</p></section>
     <section class="gaze-controls" aria-label="眼动控制"><div class="gaze-status" role="status" aria-live="polite">进入全屏并开启摄像头，开始校准。</div>
       <div class="gaze-control-row"><button data-action="fullscreen">进入全屏</button><button class="gaze-primary" data-action="start">开启摄像头</button>
       <button class="gaze-primary" data-action="guided" disabled>轻松校准并准备徒步</button><button data-action="calibrate" disabled>位置校准（15项）</button><button data-action="validate" disabled>五点验证</button><button data-action="stop" disabled>停止</button></div>
@@ -129,7 +129,7 @@ export function mountGazeTest(parent: HTMLElement, options: { onSceneReady?: (ca
     mapping = null; positionPassed = false; screenPassed = false; screenCalibrated = false;
     get('.gaze-demo-targets').hidden = true; rows = []; allFeatures = []; screenRows = []; screenSeeds = []; pointFeatures = [];
   }
-  const camera = new CameraAttention(update => {
+  const onCameraUpdate = (update: CameraUpdate) => {
     // The camera continues publishing to the game; the hidden setup needs no DOM work.
     if (parent.hidden) return;
     const { sample, features, position, screen } = update;
@@ -156,7 +156,10 @@ export function mountGazeTest(parent: HTMLElement, options: { onSceneReady?: (ca
       const canvas = get<HTMLCanvasElement>('.gaze-eye-preview'); canvas.hidden = !get<HTMLInputElement>('[data-setting="eye-preview"]').checked;
       camera.drawEyePreview(canvas, canvas.hidden ? null : features);
     }
-  }, message => { status.textContent = message; if (!camera.running && !starting) { guided = false; started = false; resetCalibration(); cancelTask(); } controls(); });
+  };
+  const camera = options.camera ?? new CameraAttention(onCameraUpdate, message => { status.textContent = message; if (!camera.running && !starting) { guided = false; started = false; resetCalibration(); cancelTask(); } controls(); });
+  const offCameraUpdates = options.camera ? camera.subscribeUpdates(onCameraUpdate) : () => {};
+  if (options.camera) started = camera.running;
   const offEvents = camera.subscribeEvents(event => {
     if (parent.hidden) return;
     get('.gaze-interaction-report').textContent = `${event.type} · ${event.targetId ?? '—'} · ${Math.round(event.progress * 100)}%`;
@@ -314,7 +317,16 @@ export function mountGazeTest(parent: HTMLElement, options: { onSceneReady?: (ca
   button('screen-export').onclick = () => download('\uFEFFsource,entryPolicy,targetId,expected,state,reason,timestampMs\r\n' + screenMeasurements.map(r => ['camera', entryPolicy.id, r.targetId, r.inside ? 'on-screen' : 'off-screen', r.state, r.reason, r.timestampMs].join(',')).join('\r\n'), 'gaze-screen-camera.csv');
   const resize = () => { guided = false; cancelTask(); resetCalibration(); mode.textContent = '显示区域变化，请重新校准'; controls(); };
   const visibility = () => { if (document.hidden && task) pausePoint('采样已暂停。回到页面后重试当前点，已完成的采样保留。'); };
-  window.addEventListener('resize', resize); document.addEventListener('fullscreenchange', resize); document.addEventListener('visibilitychange', visibility); window.addEventListener('pagehide', stopCamera);
+  window.addEventListener('resize', resize); document.addEventListener('fullscreenchange', resize); document.addEventListener('visibilitychange', visibility); window.addEventListener('exhibit:before-pause', suspendCalibration); window.addEventListener('exhibit:camera-restored', restoreCalibrationUI);
+  function suspendCalibration() { startOperation++; starting=false; guided=false; cancelTask(); void audio?.suspend(); }
+  function restoreCalibrationUI(event: Event) {
+    const detail=(event as CustomEvent<{camera:CameraAttention;recalibrate:boolean}>).detail;
+    if(detail.camera!==camera)return;
+    started=camera.running;starting=false;
+    if(!detail.recalibrate){const saved=camera.exportCalibration();mapping=saved.mapping;positionPassed=saved.positionVerified;screenPassed=saved.screenVerified;screenCalibrated=!!saved.screenModel;}
+    if(detail.recalibrate){resetCalibration();parent.hidden=false;status.textContent='请重新校准，原徒步位置与进度已保留。';}
+    controls();
+  }
   controls();
-  return () => { disposed = true; startOperation++; cancelTask(); offEvents(); camera.dispose(); void audio?.close(); window.removeEventListener('resize', resize); document.removeEventListener('fullscreenchange', resize); document.removeEventListener('visibilitychange', visibility); window.removeEventListener('pagehide', stopCamera); root.remove(); };
+  return () => { disposed = true; startOperation++; cancelTask(); offEvents(); offCameraUpdates(); camera.dispose(); void audio?.close(); window.removeEventListener('resize', resize); document.removeEventListener('fullscreenchange', resize); document.removeEventListener('visibilitychange', visibility); window.removeEventListener('exhibit:before-pause', suspendCalibration); window.removeEventListener('exhibit:camera-restored', restoreCalibrationUI); root.remove(); };
 }

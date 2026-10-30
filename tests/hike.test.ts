@@ -48,3 +48,5 @@ test('progress never treats synthetic fixtures or low-coverage sessions as measu
  const current={...good,id:'b',onScreenMs:54000,offScreenMs:6000,focusRatio:.9};assert.ok(Math.abs(hikeProgress([good],current).change!-.1)<1e-8);
  assert.equal(hikeProgress([good],{...current,coverageRatio:.1}).change,null);assert.equal(hikeProgress([good],{...current,plannedMinutes:10}).change,null);
 });
+
+test('background time does not consume remaining weather feedback',()=>{const h=session();h.accept(sample(0,'outside'),0);h.pause(1000);assert(h.isStorm(100000));h.resume(100000);assert(h.isStorm(128999));assert(!h.isStorm(129000));assert.equal(h.elapsedMs,1000);});

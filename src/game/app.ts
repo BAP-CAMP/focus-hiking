@@ -36,7 +36,7 @@ export function mountGame(app: HTMLElement, attention?: AttentionPort, options: 
   const enableSound=()=>{
     if(!forest)return Promise.resolve();soundWanted=true;if(soundPending)return soundPending;
     const view=forest;soundButton.textContent='正在开启声音…';
-    soundPending=(async()=>{try{await view.armAudio();if(disposed||view!==forest||!soundWanted)return;view.mute(false);soundsOn=true;soundButton.textContent='静音';soundButton.setAttribute('aria-pressed','true');soundButton.title='环境声音已开启';}catch{if(disposed||view!==forest||!soundWanted)return;view.mute(true);soundsOn=false;soundButton.textContent='点击开启环境声音';soundButton.setAttribute('aria-pressed','false');soundButton.title='声音未启动，请点击重试；也请检查系统音量';}finally{soundPending=null;}})();
+    soundPending=(async()=>{try{await view.armAudio();if(disposed||view!==forest||!soundWanted||suspended)return;view.mute(false);soundsOn=true;soundButton.textContent='静音';soundButton.setAttribute('aria-pressed','true');soundButton.title='环境声音已开启';}catch{if(disposed||view!==forest||!soundWanted||suspended)return;view.mute(true);soundsOn=false;soundButton.textContent='点击开启环境声音';soundButton.setAttribute('aria-pressed','false');soundButton.title='声音未启动，请点击重试；也请检查系统音量';}finally{soundPending=null;}})();
     return soundPending;
   };
   weatherSelect.addEventListener('change',()=>{forest?.setWeather(weatherSelect.value==='rain'?'rain':'clear');const url=new URL(location.href);url.searchParams.set('weather',weatherSelect.value);history.replaceState(null,'',url);if(soundWanted)void enableSound();});
@@ -130,8 +130,10 @@ export function mountGame(app: HTMLElement, attention?: AttentionPort, options: 
   const frameTimes: number[] = [];
   const search = new URLSearchParams(location.search);
   const fixedView = search.get('view');
+  let suspended = !!document.documentElement.dataset.exhibitPaused || document.hidden;
   const render = (now: number) => {
-    if (disposed || !forest) return;
+    frame = 0;
+    if (disposed || !forest || suspended || document.hidden) return;
     const dt = last ? now - last : 0; last = now;
     if (!document.hidden) {
       const hikeWalking = options.onFrame?.(forest, now, dt) ?? false;
@@ -227,10 +229,10 @@ export function mountGame(app: HTMLElement, attention?: AttentionPort, options: 
   map.onclick = event => { if (!planning) return; const point = map.createSVGPoint(); point.x = event.clientX; point.y = event.clientY; const matrix = map.getScreenCTM(); if (matrix) { const p = point.matrixTransform(matrix.inverse()); plan([p.x,0,p.y]); } };
   get<HTMLButtonElement>('#center').onclick = () => forest?.resetLook();
   app.querySelectorAll<HTMLButtonElement>('[data-destination]').forEach(button => { button.onclick = () => { const view = forest?.manifest.viewpoints.find(v => v.id === button.dataset.destination); if (view) plan(view.position); }; });
-  const pointerDown = (event: PointerEvent) => { if (options.hike || !intro.hidden || fixedView) return; drag = { x: event.clientX, y: event.clientY, moved: false }; host.setPointerCapture(event.pointerId); };
-  const pointerMove = (event: PointerEvent) => { if (!drag) return; const dx = event.clientX - drag.x, dy = event.clientY - drag.y; if (Math.abs(dx) + Math.abs(dy) > 2) drag.moved = true; forest?.look(dx, dy); drag.x = event.clientX; drag.y = event.clientY; };
+  const pointerDown = (event: PointerEvent) => { if (suspended || options.hike || !intro.hidden || fixedView) return; drag = { x: event.clientX, y: event.clientY, moved: false }; host.setPointerCapture(event.pointerId); };
+  const pointerMove = (event: PointerEvent) => { if (suspended || !drag) return; const dx = event.clientX - drag.x, dy = event.clientY - drag.y; if (Math.abs(dx) + Math.abs(dy) > 2) drag.moved = true; forest?.look(dx, dy); drag.x = event.clientX; drag.y = event.clientY; };
   const pointerUp = (event: PointerEvent) => { if (drag && !drag.moved && exploring && planning && forest) { const rect = host.getBoundingClientRect(); const goal = forest.pick((event.clientX - rect.left) / rect.width, (event.clientY - rect.top) / rect.height); if (goal) plan(goal); } drag = null; };
-  const keyDown = (event: KeyboardEvent) => { if (options.hike || event.target instanceof HTMLInputElement || event.target instanceof HTMLTextAreaElement || !intro.hidden || fixedView) return; const key = event.key.toLowerCase(); if ('wasd'.includes(key) && key.length === 1) { event.preventDefault(); if (!exploring) setExploring(); keys.add(key); } };
+  const keyDown = (event: KeyboardEvent) => { if (suspended || options.hike || event.target instanceof HTMLInputElement || event.target instanceof HTMLTextAreaElement || !intro.hidden || fixedView) return; const key = event.key.toLowerCase(); if ('wasd'.includes(key) && key.length === 1) { event.preventDefault(); if (!exploring) setExploring(); keys.add(key); } };
   const keyUp = (event: KeyboardEvent) => keys.delete(event.key.toLowerCase());
   const blur = () => { keys.clear(); drag = null; };
   host.addEventListener('pointerdown', pointerDown); host.addEventListener('pointermove', pointerMove); host.addEventListener('pointerup', pointerUp); host.addEventListener('pointercancel', blur);
@@ -257,7 +259,11 @@ export function mountGame(app: HTMLElement, attention?: AttentionPort, options: 
   };
   get<HTMLButtonElement>('#end-report').onclick = () => get<HTMLButtonElement>('#report').click();
   const resize = () => forest?.resize();
-  const visibility = () => { last = 0; if (document.hidden) { tour.pause(); explorationPaused = true; keys.clear(); pause.textContent = '继续'; } };
+  const suspend = () => { suspended = true; last = 0; keys.clear(); drag = null; cancelAnimationFrame(frame); frame = 0; forest?.mute(true); };
+  const resume = () => { if (disposed || document.hidden) return; suspended = false; last = 0; keys.clear(); if (!frame && forest) frame = requestAnimationFrame(render); if (soundWanted) void enableSound(); };
+  const visibility = () => { if (document.hidden) suspend(); };
+  window.addEventListener('exhibit:pause', suspend);
+  window.addEventListener('exhibit:resumed', resume);
   const contextLost = (event: Event) => { event.preventDefault(); cancelAnimationFrame(frame); tour.pause(); error.hidden = false; error.querySelector('p')!.textContent = '图形上下文已丢失，请重新加载。'; };
   window.addEventListener('resize', resize);
   document.addEventListener('visibilitychange', visibility);
@@ -267,6 +273,6 @@ export function mountGame(app: HTMLElement, attention?: AttentionPort, options: 
     subscribeEvents(listener) { sceneListeners.add(listener); return () => { sceneListeners.delete(listener); }; },
     handleCommand() { throw new Error('M1 自动游览尚不支持训练命令；请在 M4 契约审查后接入。'); },
   };
-  return { ...port, dispose() { disposed = true; attempt++; offSamples?.(); offEvents?.(); attention?.setTargets([]); cancelAnimationFrame(frame); forest?.dispose(); sceneListeners.clear(); app.removeEventListener('pointerdown',audioGesture,true);app.removeEventListener('keydown',audioGesture,true);window.removeEventListener('resize', resize); window.removeEventListener('keydown', keyDown); window.removeEventListener('keyup', keyUp); window.removeEventListener('blur', blur); document.removeEventListener('visibilitychange', visibility); host.removeEventListener('pointerdown', pointerDown); host.removeEventListener('pointermove', pointerMove); host.removeEventListener('pointerup', pointerUp); host.removeEventListener('pointercancel', blur); host.removeEventListener('webglcontextlost', contextLost, true); app.replaceChildren(); } };
+  return { ...port, suspend, resume, dispose() { disposed = true; window.removeEventListener('exhibit:pause', suspend); window.removeEventListener('exhibit:resumed', resume); attempt++; offSamples?.(); offEvents?.(); attention?.setTargets([]); cancelAnimationFrame(frame); forest?.dispose(); sceneListeners.clear(); app.removeEventListener('pointerdown',audioGesture,true);app.removeEventListener('keydown',audioGesture,true);window.removeEventListener('resize', resize); window.removeEventListener('keydown', keyDown); window.removeEventListener('keyup', keyUp); window.removeEventListener('blur', blur); document.removeEventListener('visibilitychange', visibility); host.removeEventListener('pointerdown', pointerDown); host.removeEventListener('pointermove', pointerMove); host.removeEventListener('pointerup', pointerUp); host.removeEventListener('pointercancel', blur); host.removeEventListener('webglcontextlost', contextLost, true); app.replaceChildren(); } };
 }
 
