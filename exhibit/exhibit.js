@@ -9,7 +9,7 @@
  .exhibit-nav a,.exhibit-status a{color:inherit;text-decoration:none}.exhibit-nav button,.exhibit-status button{font:inherit;color:inherit;cursor:pointer;border:1px solid #a7b8ad;border-radius:4px;background:#263a30;padding:6px 12px}.exhibit-nav button:disabled,.exhibit-status button:disabled{opacity:.6;cursor:wait}
  .exhibit-nav :focus-visible,.exhibit-status :focus-visible{outline:3px solid #abcbd2;outline-offset:3px}
  .exhibit-status{position:fixed;z-index:10001;bottom:76px;right:12px;max-width:min(640px,calc(100vw - 24px));box-sizing:border-box;display:flex;gap:10px;align-items:center;flex-wrap:wrap;padding:12px 16px;color:#f5f5f1;background:#202b27;border:1px solid #82988b;border-radius:8px;font:14px/1.5 system-ui;box-shadow:0 3px 16px #0003}
- .exhibit-status[hidden]{display:none!important}.exhibit-status p{margin:0;flex:1 1 180px;overflow-wrap:anywhere}.exhibit-status a{padding:6px}.exhibit-nav button{background:transparent}
+ .exhibit-status[hidden]{display:none!important}.exhibit-status p{color:#f5f5f1;margin:0;flex:1 1 180px;overflow-wrap:anywhere}.exhibit-status a{padding:6px}.exhibit-nav button{background:transparent}
  @media(max-width:600px){.exhibit-nav{font-size:12px;gap:8px;bottom:6px;right:6px;padding:8px;max-width:calc(100vw - 12px)}.exhibit-status{bottom:66px;right:6px;max-width:calc(100vw - 12px);padding:10px;font-size:13px}}
  `;document.head.append(style);
  const nav=document.createElement('nav');nav.className='exhibit-nav';nav.setAttribute('aria-label','作品导航');
