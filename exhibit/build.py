@@ -13,7 +13,7 @@ def copy(source,target):
  p=ROOT/source;q=STAGE/target
  if p.is_dir():
   for f in p.rglob('*'):
-   if f.is_file() and not (SLUG=='elder-protecter' and (f.name.startswith('test-') or '.test.' in f.name)) and f.suffix not in ('.map','.ts','.blend','.py','.md') and f.name not in ('AGENTS.md','CLAUDE.md','forest-build.json') and not any(x in ('node_modules','__pycache__','.git') for x in f.parts):
+   if f.is_file() and not (SLUG=='elder-protecter' and (f.name.startswith('test-') or '.test.' in f.name)) and f.suffix not in ('.map','.ts','.blend','.py','.md') and f.name not in ('AGENTS.md','CLAUDE.md','forest-build.json','.nojekyll') and not any(x in ('node_modules','__pycache__','.git') for x in f.parts):
     transfer(f,q/f.relative_to(p))
   for f in p.rglob('*'):
    if f.is_file() and (f.name.startswith('LICENSE') or f.name.startswith('CREDITS')): transfer(f,q/f.relative_to(p))
