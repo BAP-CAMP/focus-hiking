@@ -1,5 +1,7 @@
 # 原作与展示适配
 
+公开作品署名：**山间野人小组**（Camp001 参赛小组，2026-10-30 确认）。以下 GitHub 标识保留为原始贡献记录，不用于推断学生真实姓名或分工。
+
 原作：[llllllir/focus-hiking](https://github.com/llllllir/focus-hiking)。
 
 采用版本：`69400dbb391cc91b4f702773d3b6d66f2797940d`。原始提交历史完整保留。

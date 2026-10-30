@@ -80,3 +80,7 @@ npm run preview
 原作者、采用版本及贡献记录见 [ATTRIBUTION.md](ATTRIBUTION.md)。
 独立静态入口：`/demo/focus-hiking/`。官网只加载静态封面，点击后才进入交互。
 构建与验收见 [exhibit/README.md](exhibit/README.md)。
+
+### Collective 公开署名
+
+Camp001 参赛小组：**山间野人小组**。BAP 负责官网展示适配与交互改进；原始 Git 贡献者及素材来源见 [ATTRIBUTION.md](ATTRIBUTION.md)。

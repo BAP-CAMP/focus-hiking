@@ -11,5 +11,7 @@
   "device": "摄像头体验需要电脑、摄像头和 HTTPS。",
   "note": "注视与登山交互演示，不代表注意力训练效果。",
   "adoptedBranch": "codex/m3-attention-calibration-fix",
-  "repositoryVisibility": "public"
+  "repositoryVisibility": "public",
+  "team": "山间野人小组",
+  "attributionType": "Camp001 参赛小组"
 }
